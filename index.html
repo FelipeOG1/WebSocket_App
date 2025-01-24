@@ -8,6 +8,7 @@
             <h1>WebSockets Echo Demo</h1>
             <button type="submit" id="open_ws">Open WS</button>
             <div id="status">Status: Not connected</div>
+            <div id="server_response"></div>
            
             <ul id="table"></ul>
            
@@ -26,6 +27,8 @@
             let open_ws_btn = document.getElementById("open_ws");
             let close_ws_btn = document.getElementById("close_ws")
             let prepopulate_btn=document.getElementById("prep_ws")
+
+            let server_response=document.getElementById("server_response");
          
             let form = document.getElementById("form");
 
@@ -102,17 +105,61 @@
                  
                     socketStatus.className = "closed";
                     table.innerHTML = "";
+                    let closeReason=closeEventObject.reason;
+                    
             
                     switch (closeEventObject.code) {
-                        case 1006: // network problem (e.g. your websocket server is not running)
-                            socketStatus.innerHTML = "Something is wrong with your WS newtork connection";
-                            break;
+
+
                         case 1001: // if a peer (client or server) closes the connection immediately
-                            socketStatus.innerHTML = `Disconnected reason: ${closeEventObject.reason}`;
+                            socketStatus.innerHTML = `Disconnected reason: ${closeReason}`;
                             table.innerHTML = "";
+
+                            server_response.innerHTML=`Server Response: ${closeReason}`
                             break; 
+
+                            case 1002:
+
+                            socketStatus.innerHTML=`Client does not send proper data frame`
+
+                            table.innerHTML=""
+
+                             server_response.innerHTML=`Server Response: ${closeReason}`
+
+                            case 1003:
+
+                            socketStatus.innerHTML = "Unsoported data type";
+                            table.innerHTML="";
+                              server_response.innerHTML=`Server Response: ${closeReason}`
+
+    
+                            break;
+
+                            case 1006: // network problem (e.g. your websocket server is not running)
+                            socketStatus.innerHTML = "Something is wrong with your WS newtork connection";
+                              server_response.innerHTML=`Server Response: ${closeReason}`
+                            break;
+
+                            case 1008: // Server policy breached
+                            socketStatus.innerHTML = "No status code was provided";
+                            server_response.innerHTML=`Server Response: ${closeReason}`
+                            break;
+
+
+
+
+
+                            case 1009:
+                            socketStatus.innerHTML="Data is too long for the WebSocket Server"
+                            server_response.innerHTML=`Server Response: ${closeReason}`
+
+                            break;
+
+
+                       
                         default: // when the client hits the close websocket button
                             socketStatus.innerHTML = `You disconnected by clicking the Close button.`;
+                            server_response.innerHTML=`Server Response: ${closeReason}`
                     }
 
                     // FORM REMOVAL
@@ -130,7 +177,7 @@
                     console.log("Error event was throgn. ERROR OBJECT: ", error);
                     socketStatus.innerHTML = "Error.";
                     socketStatus.className = "closed";
-                }
+                };
 
                 // *** SEND METHOD
                 form.addEventListener('submit', (e) => {
@@ -150,7 +197,7 @@
                     socketStatus.innerHTML = "closing ... please wait ..."
                     socketStatus.classList.add('closing');
                     
-                    socket.close(1000, "I don't like you");
+                    socket.close(1000,'n');
                   
                     message.removeAttribute("required");
                     form.classList.remove("show");

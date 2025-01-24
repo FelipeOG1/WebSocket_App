@@ -218,7 +218,15 @@ class WebSocketReceiver{
         //Every message coming from the client has to be masked.
         if (!this.#mask){
 
-            throw new Error('Mask is not set to the client')
+                this.#sendClose(1002,'Client did not set a correct masking bit')
+
+             
+        }
+
+        if([CONSTANTS.OPCODE_PING,CONSTANTS.OPCODE_PONG].includes(this.#opcode)){
+                    this.#sendClose(1003,'Server does not accept Ping or Pong responses yet');
+
+                   
             
         }
         //if the payloadLength of the current frame is 125 or less, there is no need to process the extended payload length because theres any
@@ -263,7 +271,7 @@ class WebSocketReceiver{
 
         if(minSize===this.#buffersArray[0].length){
 
-            return this.#buffersArray[0].shift();
+            return this.#buffersArray.shift();
             
         }
 
@@ -342,7 +350,7 @@ class WebSocketReceiver{
 
         if (this.#totalPayloadLength>this.#maxPayloadLength){
 
-            throw new Error('Max payload length capacity')
+            this.#sendClose(1009,'WebSocket server does not support such a huge payload');
         }
 
 
@@ -550,7 +558,9 @@ class WebSocketReceiver{
 
         if(!closureFrame){
 
-            this.#sendClose(1001,'send proper message next time')
+            this.#sendClose(1008,'No status code detected')
+
+            return 
 
             
         }
@@ -558,6 +568,15 @@ class WebSocketReceiver{
 
         //Close are in the first two bytes and the closeReason in the second two Bytes
         let closeCode=closureFrame.readUInt16BE();
+
+        if(closeCode===1001){
+
+            this._socket.destroy()
+
+            this.#reset()
+
+            return
+        }
 
         let closeReason=closureFrame.toString('utf8',2)
 
@@ -644,6 +663,9 @@ class WebSocketReceiver{
     };
 
 
+
+
+
     #reset() {
         this.#buffersArray = []; 
         this.#bufferedBytesLength= 0;
@@ -658,7 +680,7 @@ class WebSocketReceiver{
         this.#maskKey = Buffer.alloc(CONSTANTS.MASK_KEY_CONSUMSPTION); 
         this.#totalFrames = 0; 
         this.#fragments = []; 
-    }; // *end reset
+    };
     
 
 }

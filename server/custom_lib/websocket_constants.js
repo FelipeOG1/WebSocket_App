@@ -16,6 +16,7 @@ module.exports={
     GET_PAYLOAD:4,
     SEND_ECHO:5,
     GET_CLOSE_INFO:6,
+    
 
 
     SMALL_PAYLOAD_FLAG:125,
