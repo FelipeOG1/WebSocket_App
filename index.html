@@ -70,6 +70,29 @@
 
                 // MESSAGE EVENT: handle messages when they are received from server
                 socket.onmessage = function(message) {
+
+                    console.log(socket)
+                    console.log(message)
+
+                    console.log(socket.binaryType==="blob");
+
+                    if(socket.binaryType==="blob"){
+
+                        const reader=new FileReader();
+                        reader.readAsText(message.data);
+
+
+                       reader.onload= (e)=>{
+                        const msg=e.target.result;
+                        table.innerHTML+=`<li>Echo: ${msg}</li>`
+
+                       }
+
+
+
+                    }else{
+                        console.log('no blop received ' + 'data: ' + message.data )
+                    }
                 
                 };
 
@@ -133,11 +156,13 @@
                     form.classList.remove("show");
                 });
 
+               
+
                 prepopulate_btn.addEventListener("click",(e)=>{
                     e.preventDefault();
 
 
-                    let text='A'.repeat(50000)
+                    let text='A'.repeat(150000)
                       
 
                     message.value=text

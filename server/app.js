@@ -5,12 +5,13 @@ const HTTP = require('http');
 const CONSTANTS = require('./custom_lib/websocket_constants');
 const FUNCTIONS = require('./custom_lib/websocket_methods');
 const { flushCompileCache } = require('module');
+const { inflate } = require('zlib');
 
 
 const HTTP_SERVER = HTTP.createServer((req, res) => {
     
     res.writeHead(200);
-    res.end('Hello, I hope you enjoy the "under-the-hood" WebSocket implementation');
+    res.end('=');
 });
 
 
@@ -107,9 +108,7 @@ class WebSocketReceiver{
     #task=CONSTANTS.GET_INFO;
     #fin=false; // Indicates if the message is complete (true) or a fragment (false).
     #opcode=null; // Specifies the type of data received from the client, based on the opcode.
-
     #mask=false;  // Indicates if the payload data is masked (true) or not (false).
-
     #initialPayloadLength=0 ;//less than 126 bytes means that the data here is the actual size of the payload.
     #framePayloadLength=0; //keep track of the current frame to compare it with tha actual buffers array.
     #maxPayloadLength=1024 * 1024; //Users can only send 1MB in size or one million bits;
@@ -175,9 +174,17 @@ class WebSocketReceiver{
 
                 this.#getPayload();
 
-                case CONSTANTS.SEND_ECHO:
+                break;
 
-                this.#sendEcho()
+                case CONSTANTS.SEND_ECHO:
+                    this.#sendEcho();
+
+                    break;
+
+                case CONSTANTS.GET_CLOSE_INFO:
+                    this.#getCloseInfo();
+
+               
                 
             }
 
@@ -189,6 +196,12 @@ class WebSocketReceiver{
     };
 
     #getInfo(){
+
+        if(this.#bufferedBytesLength < CONSTANTS.MINUMUM_SIZE){
+
+            this.#taskLoop=false;
+            return
+        }
         const infoBuffer=this.#consumeHeaders(CONSTANTS.MINUMUM_SIZE);
         const firstByte=infoBuffer[0];
         const secondByte=infoBuffer[1];
@@ -209,7 +222,7 @@ class WebSocketReceiver{
             
         }
         //if the payloadLength of the current frame is 125 or less, there is no need to process the extended payload length because theres any
-        if(this.#initialPayloadLength<=125){
+        if(this.#initialPayloadLength<=CONSTANTS.SMALL_PAYLOAD_FLAG){
 
             this.#framePayloadLength=this.#initialPayloadLength;
 
@@ -243,6 +256,8 @@ class WebSocketReceiver{
         //consume headers function is used to extract the info bytes and other crucial bytes like the masking key
    
     #consumeHeaders(minSize){
+
+      
         this.#bufferedBytesLength-=minSize;
 
 
@@ -275,19 +290,17 @@ class WebSocketReceiver{
         //Extract the next two bytes that contains the extended payload length
 
         // Case 126 we have to consume the next 2 bytes 
-        let payloadBuffer;
+   
 
       
         if(this.#initialPayloadLength===CONSTANTS.MEDIUM_PAYLOAD_FLAG){
 
-           payloadBuffer=this.#consumeHeaders(CONSTANTS.MEDIUM_PAYLOAD_CONSUMSPTION);
+           let mediumPayloadBuffer=this.#consumeHeaders(CONSTANTS.MEDIUM_PAYLOAD_CONSUMSPTION);
 
-           this.#framePayloadLength=payloadBuffer.readUInt16BE();
-
-
+           this.#framePayloadLength=mediumPayloadBuffer.readUInt16BE();
 
 
-            this.#processLength();
+           this.#processLength();
            
 
 
@@ -298,8 +311,8 @@ class WebSocketReceiver{
         //case 127 we have to consume the next 8 bytes.
 
         
-         payloadBuffer=this.#consumeHeaders(CONSTANTS.LARGE_PAYLOAD_CONSUMPTION);
-         let bigPayloadBuffer=payloadBuffer.readBigUInt64BE();
+         let LargePayloadBuffer=this.#consumeHeaders(CONSTANTS.LARGE_PAYLOAD_CONSUMPTION);
+         let bigPayloadBuffer=LargePayloadBuffer.readBigUInt64BE();
 
          this.#framePayloadLength=Number(bigPayloadBuffer);
 
@@ -311,7 +324,7 @@ class WebSocketReceiver{
         }
 
 
-        return payloadBuffer
+
 
 
 
@@ -367,7 +380,7 @@ class WebSocketReceiver{
         
 
         if(this.#bufferedBytesLength < this.#framePayloadLength){
-//if this trigers means that we have to wait for more chunks to be able to unmask the entire data.
+        //if this trigers means that we have to wait for more chunks to be able to unmask the entire data.
 
            this.#taskLoop=false;
 
@@ -395,6 +408,13 @@ class WebSocketReceiver{
 
        }
 
+       if(this.#opcode===CONSTANTS.OPCODE_CLOSE){
+
+        this.#task=CONSTANTS.GET_CLOSE_INFO
+
+        return
+       }
+
 
        //if fin equal false, there is no more fragments meaning we completed to extract all the payload data
 
@@ -408,7 +428,12 @@ class WebSocketReceiver{
 
         console.log('total payload length' + " " + this.#totalPayloadLength)
 
-        this.#task=CONSTANTS.SEND_ECHO;
+
+        this.#task=CONSTANTS.SEND_ECHO
+
+        
+
+ 
 
 
     }
@@ -422,55 +447,195 @@ class WebSocketReceiver{
 
 
     //Consume payload initialize a buffer with a length of the payloadLength extracted with the getLengh function and then fill the buffer with the entire masked payload
-    #consumePayload(payloadLength){
+    #consumePayload(payloadLength) {
+        this.#bufferedBytesLength -= payloadLength;
+        const payloadBuffer = Buffer.alloc(payloadLength);
+        let bytesConsumed = 0;
+    
+        while(bytesConsumed < payloadLength) {
+            const buff = this.#buffersArray[0];
+            const bytesToRead = Math.min(payloadLength - bytesConsumed, buff.length);
+            buff.copy(payloadBuffer, bytesConsumed, 0, bytesToRead);
+            bytesConsumed += bytesToRead;
+    
+            if(bytesToRead < buff.length) {
+                this.#buffersArray[0] = buff.slice(bytesToRead);
+            } else {
+                this.#buffersArray.shift();
+            }
+        }
+    
+        return payloadBuffer; 
+    }
+
+
+    #sendEcho() {
+       
+        // extract all the fragments to get the actual payload content
+        const fullMessage = Buffer.concat(this.#fragments); 
+
+        let payloadLength = fullMessage.length; 
+        
+        let additionalPayloadSizeIndicator = null; 
+
+        // determine the additional bytes required to represent the payload size
+        switch (true) {
+            case (payloadLength <= CONSTANTS.SMALL_PAYLOAD_FLAG):
+                additionalPayloadSizeIndicator = 0; 
+                break;
+            case (payloadLength > CONSTANTS.SMALL_PAYLOAD_FLAG && payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE): 
+                additionalPayloadSizeIndicator = CONSTANTS.MEDIUM_PAYLOAD_CONSUMSPTION;
+                break; 
+            default:
+                additionalPayloadSizeIndicator = CONSTANTS.LARGE_PAYLOAD_CONSUMPTION 
+        };
+
+        const frame = Buffer.alloc(CONSTANTS.MINUMUM_SIZE + additionalPayloadSizeIndicator + payloadLength);
+        
+    
+        // create first byte
+        let fin = 0x01; 
+        let rsv1 = 0x00;
+        let rsv2 = 0x00;
+        let rsv3 = 0x00;
+        let opcode = CONSTANTS.OPCODE_BINARY; 
+        // shift biwise operator - shift all bits to their correct positions
+        let firstByte = (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | opcode;
+        frame[0] = firstByte; // FIN, RSV, + OPCODE
+
+      
+        // server to client do not require mask
+        let maskingBit = 0x00; 
+
+
+        //Determine the payload Flag of the Frame
+        if(payloadLength <= CONSTANTS.SMALL_PAYLOAD_FLAG) {
+            
+            frame[1] = (maskingBit | payloadLength);
+        } else if (payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE) {
+        
+            frame[1] = (maskingBit | CONSTANTS.MEDIUM_PAYLOAD_FLAG);
+           
+            frame.writeUInt16BE(payloadLength, CONSTANTS.MINUMUM_SIZE); 
+        } else {
+          
+            frame[1] = (maskingBit | CONSTANTS.LARGE_PAYLOAD_FLAG); 
+            
+            frame.writeBigInt64BE(BigInt(payloadLength), CONSTANTS.MINUMUM_SIZE);
+        };
+
+      
+
+        // copy our message into the frame buffer
+        const messageStartOffset = CONSTANTS.MINUMUM_SIZE + additionalPayloadSizeIndicator;
+        fullMessage.copy(frame, messageStartOffset);
+
+    
+        this._socket.write(frame);
+        this.#reset();
+    };
+
+   
 
     
 
-        this.#bufferedBytesLength -= payloadLength
+//If a frame with the opcode 8 is recevied, means the client wants to close the connection
+    #getCloseInfo(){
+
+//Closure frames can not be fragmented, meaning position 0 contains the entire the close frame
         
-        const payloadBuffer=Buffer.alloc(payloadLength)
-
-        let bytesConsumed=0
+        let closureFrame=this.#fragments[0];
 
 
-       while(bytesConsumed<payloadLength){
 
-        const buff=this.#buffersArray[0];
+        if(!closureFrame){
 
-        const bytesToRead=Math.min(payloadLength-bytesConsumed,buff.length);
+            this.#sendClose(1001,'send proper message next time')
 
-
-        buff.copy(payloadBuffer,bytesConsumed,0,bytesToRead);
-
-        bytesConsumed+=bytesToRead;
-
-
-        if(bytesConsumed < buff.length){
-
-            this.#buffersArray[0]=this.#buffersArray.slice(bytesToRead)
-        }else{
-
-
-            this.#buffersArray.shift();
+            
         }
 
 
+        //Close are in the first two bytes and the closeReason in the second two Bytes
+        let closeCode=closureFrame.readUInt16BE();
 
+        let closeReason=closureFrame.toString('utf8',2)
 
+        console.log(`Received close frame with the code ${closeCode} and the reason ${closeReason}`);
 
-        return payloadBuffer
-
-
-
-
-
-
-
+        let serverResponse="bai"
 
 
 
         
-       }
+        this.#sendClose(closeCode,serverResponse)
+
+
+
+       
+
+
+
+    };
+
+
+    //Send close is necesary to understand the reason and sen the proper response to client so the conneciton can be close as the RFC6455 intended
+
+    #sendClose(cCode,cReason){
+
+        
+
+        let closureCode=(typeof cCode!='undefined' && cCode)? cCode:1000
+
+        let closureReason=(typeof cReason!='undefined' && cReason)? cReason:""
+
+
+
+
+        const closureReasonBuffer=Buffer.from(closureReason,'utf-8')
+
+        const closureReasonLength=closureReasonBuffer.length;
+
+        
+
+
+        const closeFramePayload=Buffer.alloc(CONSTANTS.MINUMUM_SIZE + closureReasonLength);
+
+
+        //fill the closure code and the closure reason 
+        closeFramePayload.writeInt16BE(closureCode,0);
+
+        closureReasonBuffer.copy(closeFramePayload,2)
+
+
+        //Create the infoBytes
+
+        const firstByte=   0b10000000 | 0b00000000  | 0b00000000 | 0b00000000 | 0b00001000;
+
+        //create the payload lag bytes, all closure payloads cant be bigger than 124, so this flag indicates the actual payload size
+        const secondByte= closeFramePayload.length;
+
+        const mandatoryFrame=Buffer.from([firstByte,secondByte])
+
+        const closeFrame=Buffer.concat([mandatoryFrame,closeFramePayload]);
+
+      //Send the closeFrame to the client and close the socket connection immediately
+
+        this._socket.write(closeFrame);
+
+        this._socket.end()
+
+        
+      this.#reset()
+
+    
+
+
+
+
+
+
+
 
 
 
@@ -478,17 +643,22 @@ class WebSocketReceiver{
 
     };
 
+
+    #reset() {
+        this.#buffersArray = []; 
+        this.#bufferedBytesLength= 0;
+        this.#taskLoop = false; 
+        this.#task = CONSTANTS.GET_INFO;
+        this.#fin = false; 
+        this.#opcode = null; 
+        this.#mask = false; 
+        this.#initialPayloadLength = 0; 
+        this.#framePayloadLength = 0; 
+        this.#totalPayloadLength = 0; 
+        this.#maskKey = Buffer.alloc(CONSTANTS.MASK_KEY_CONSUMSPTION); 
+        this.#totalFrames = 0; 
+        this.#fragments = []; 
+    }; // *end reset
     
-    #sendEcho(){
 
-    }
-
-
-
-
-
-
-    
 }
-
-
