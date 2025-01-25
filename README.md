@@ -1,5 +1,6 @@
 # WebSocket Server Implementation in Node.js
 
+
 This repository contains a **WebSocket server** implemented from scratch using **Node.js**. The server follows the **RFC 6455** protocol and provides functionalities such as message handling, echo responses, and proper connection closure. It also includes an **interactive HTML interface** to test WebSocket features.
 
 ---
@@ -17,19 +18,7 @@ This repository contains a **WebSocket server** implemented from scratch using *
 - **Interactive Testing Interface**: Includes an `index.html` file to test WebSocket functionalities in a browser.
 
 ---
-
-## Project Structure
-/project-root
-├── /server
-│   ├── /custom_lib
-│   │   ├── websocket_constants.js    # WebSocket-related constants.
-│   │   └── websocket_methods.js      # Helper functions for WebSocket operations.
-│   ├── websocketReceiver.js          # Handles WebSocket frame processing.
-│   ├── httpServer.js                 # Main WebSocket server logic.
-│   └── app.js                        # Entry point for the server.
-├── index.html                        # Interactive interface for testing WebSocket features.
-├── styles.css                        # CSS styles for the interactive interface.
-└── README.md                         # This file.
+---
 
 ## Modules and Classes
 
@@ -74,7 +63,17 @@ This is the entry point of the application. It initializes the HTTP server and s
 1. Clone the repository:
    ```bash
    git clone https://github.com/FelipeOG1/WebSocket_App.git
-  
-2. Start the server:
- ```bash
- node server/app.js
+   ```
+
+2. go to the repo:
+   ```bash
+   cd WebSocket_App
+   ```
+3. start the server 
+   ```bash
+   node server/app.js
+   ```
+4. The server will start listening on port 8080 (or the port specified in CONSTANTS.PORT).
+
+
+ 
