@@ -1,4 +1,6 @@
-This repository contains a **WebSocket server** implemented from scratch using **Node.js**. The server follows the **RFC 6455** protocol and provides functionalities such as message handling, echo responses, and proper connection closure.
+# WebSocket Server Implementation in Node.js
+
+This repository contains a **WebSocket server** implemented from scratch using **Node.js**. The server follows the **RFC 6455** protocol and provides functionalities such as message handling, echo responses, and proper connection closure. It also includes an **interactive HTML interface** to test WebSocket features.
 
 ---
 
@@ -12,6 +14,58 @@ This repository contains a **WebSocket server** implemented from scratch using *
 - **Echo Functionality**: Sends back received messages to the client.
 - **Connection Closure**: Properly handles connection closure with status codes and reasons.
 - **Custom Error Handling**: Catches and logs errors for better debugging.
+- **Interactive Testing Interface**: Includes an `index.html` file to test WebSocket functionalities in a browser.
+
+---
+
+## Project Structure
+/project-root
+├── /server
+│   ├── /custom_lib
+│   │   ├── websocket_constants.js    # WebSocket-related constants.
+│   │   └── websocket_methods.js      # Helper functions for WebSocket operations.
+│   ├── websocketReceiver.js          # Handles WebSocket frame processing.
+│   ├── httpServer.js                 # Main WebSocket server logic.
+│   └── app.js                        # Entry point for the server.
+├── index.html                        # Interactive interface for testing WebSocket features.
+├── styles.css                        # CSS styles for the interactive interface.
+└── README.md                         # This file.
+
+## Modules and Classes
+
+### **1. `httpServer.js`**
+This module contains the logic for creating an HTTP server that supports WebSocket upgrade requests. It handles:
+- HTTP server creation.
+- WebSocket handshake validation.
+- Connection upgrades to WebSocket.
+- Error handling for custom events.
+
+#### Key Functions:
+- **`createHTTPServer()`**: Creates and configures the HTTP server.
+- **`upgradeConnection()`**: Validates WebSocket headers and completes the handshake.
+- **`startWebSocketConnection()`**: Initializes WebSocket communication after a successful handshake.
+
+---
+
+### **2. `websocketReceiver.js`**
+This module contains the `WebSocketReceiver` class, which processes WebSocket frames and handles communication with the client.
+
+#### Key Features:
+- **Frame Parsing**: Extracts information from WebSocket frames (FIN, opcode, masking, payload length, etc.).
+- **Payload Unmasking**: Unmasks payload data using the provided masking key.
+- **Echo Functionality**: Sends received messages back to the client.
+- **Connection Closure**: Handles close frames and responds with a proper close frame.
+
+#### Key Methods:
+- **`processBuffer()`**: Processes incoming data chunks.
+- **`#sendEcho()`**: Sends an echo response to the client.
+- **`#sendClose()`**: Handles connection closure according to RFC 6455.
+- **`#reset()`**: Resets the state of the receiver for new connections.
+
+---
+
+### **3. `app.js`**
+This is the entry point of the application. It initializes the HTTP server and starts listening for WebSocket connections.
 
 ---
 
@@ -20,46 +74,7 @@ This repository contains a **WebSocket server** implemented from scratch using *
 1. Clone the repository:
    ```bash
    git clone https://github.com/FelipeOG1/WebSocket_App.git
-   cd WebSocket_App
-2. Start the Server
-    cd server
-    node app.js
-
-3. The server will start listening on port 8080 (or the port specified in CONSTANTS.PORT).
-
-
-## Usage
-
-Testing with the Interactive Interface
-The repository includes an index.html file that provides a user-friendly interface to test WebSocket functionalities. To use it:
-
-Open the index.html file in your browser.
-
-Click the "Open WS" button to establish a WebSocket connection.
-
-Use the form to send messages to the server. The server will echo the messages back.
-
-Click the "Close Connection" button to close the WebSocket connection.
-
-Use the "Prepopulate" button to test sending large payloads.
-
-Features of the Interface:
-Open WS: Establishes a WebSocket connection.
-
-Send Message: Sends a message to the server and displays the echoed response.
-
-Close Connection: Closes the WebSocket connection gracefully.
-
-Prepopulate: Automatically fills the message field with a large payload for testing.
-
-project-root
-├── /custom_lib
-│   ├── websocket_constants.js    # WebSocket-related constants.
-│   └── websocket_methods.js      # Helper functions for WebSocket operations.
-├── /src
-│   ├── websocketReceiver.js      # Handles WebSocket frame processing.
-│   ├── websocketServer.js        # Main WebSocket server logic.
-│   └── index.js                  # Entry point for the server.
-├── index.html                    # Interactive interface for testing WebSocket features.
-├── LICENSE                       # MIT License.
-└── README.md                     # This file.
+  
+2. Start the server:
+ ```bash
+ node server/app.js
