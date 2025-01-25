@@ -21,9 +21,9 @@ This repository contains a **WebSocket server** implemented from scratch using *
    ```bash
    git clone https://github.com/FelipeOG1/WebSocket_App.git
    cd WebSocket_App
-2. Start the Server
-    cd server
-    node app.js
+2. Start the server:
+ ```bash
+ node server/app.js
 
 3. The server will start listening on port 8080 (or the port specified in CONSTANTS.PORT).
 
